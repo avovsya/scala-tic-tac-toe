@@ -1,6 +1,6 @@
 package tictactoe
 
-class Board(val actor: BoardActor) {
+class Board() {
 //  def join(newPlayer: Player): Unit = {
 //    players += newPlayer
 //    broadcast(PlayerActor.PlayerJoined(newPlayer))

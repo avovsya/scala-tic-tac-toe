@@ -1,28 +1,51 @@
 package tictactoe
 
-import akka.actor.{Actor, Terminated}
+import akka.actor.{Actor, ActorRef, FSM, Terminated}
 import akka.actor.Actor.Receive
 
 object BoardActor {
-  trait IncomingMessage
-//  case class Join(player: Player) extends IncomingMessage
-//  case class Leave(player: Player) extends IncomingMessage
+
+  sealed trait BoardState
+  case object WaitingForPlayers extends BoardState
+  case object Playing extends BoardState
+
+  sealed trait BoardData
+  case object NoData extends BoardData
+  case class Data(players: Vector[ActorRef], board: Board) extends BoardData
+
+  // Events
+  case class PlayerJoined(player: ActorRef)
 }
 
-class BoardActor extends Actor {
+class BoardActor(boardManager: ActorRef) extends FSM[BoardActor.BoardState, BoardActor.BoardData] {
   import BoardActor._
 
-  val board = new Board(this)
+  startWith(WaitingForPlayers, NoData)
 
-  override def receive: Receive = {
-    ???
-//    case Join(player) => {
-//      board.join(player)
-//      context.watch(player.actor)
-//    }
-//
-//    case Leave(player) => board.leave(player)
-//
-//    case Terminated(playerActor: PlayerActor) => board.leave(playerActor.player)
+  when(WaitingForPlayers) {
+    case Event(PlayerJoined(player: ActorRef), data: Data) => {
+      val players = data.players :+ player
+      context.watch(player)
+      player ! PlayerActor.JoinBoard(self)
+      players foreach (_ ! PlayerActor.GameStarts)
+      goto(Playing) using Data(players, createBoard)
+    }
+
+    case Event(PlayerJoined(player: ActorRef), _) => {
+      context.watch(player)
+      player ! PlayerActor.JoinBoard(self)
+      stay using(Data(Vector(player), null))
+    }
   }
+
+  when(Playing) {
+    // When player left
+    case Event(Terminated(player), Data(players, _)) => {
+      players foreach (_ ! PlayerActor.GameClosed)
+      boardManager ! BoardManager.BoardReleased(self)
+      goto(WaitingForPlayers) using NoData
+    }
+  }
+
+  def createBoard: Board = new Board
 }
