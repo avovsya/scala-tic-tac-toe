@@ -22,6 +22,10 @@ object PlayerActor {
   case object GameStarts
   case object GameClosed // When one of the players leaves game
 
+  trait PlayerEvent
+  case class Mark(cell: (Int, Int)) extends PlayerEvent
+  case class Joined() extends PlayerEvent
+
   // TODO
   // PlayerActor is responsible for handling WebSocket connection messages(in & out)
   // What are the possible options to separate this from Player?
